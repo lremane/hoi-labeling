@@ -8,13 +8,15 @@
 #-------------------------------------------------------------------------------
 from __future__ import division
 from tkinter import *
+from tkinter import ttk
+
 from PIL import Image, ImageTk
 import os
 import glob
 import random
 
 # colors for the bboxes
-COLORS = ['red', 'blue', 'yellow', 'pink', 'cyan', 'green', 'black']
+COLORS = {'person': 'red', 'object': 'blue'}
 # image sizes for the examples
 SIZE = 256, 256
 
@@ -45,11 +47,13 @@ class LabelTool():
         self.STATE = {}
         self.STATE['click'] = 0
         self.STATE['x'], self.STATE['y'] = 0, 0
+        self.STATE['label_type'] = 'person'  # To store the type of label (Person/Object)
 
         # reference to bbox
         self.bboxIdList = []
         self.bboxId = None
         self.bboxList = []
+        self.bboxTypes = []  # To store type information for bboxes
         self.hl = None
         self.vl = None
 
@@ -83,15 +87,33 @@ class LabelTool():
         self.parent.bind("a", self.prevImage)  # press 'a' to go backward
         self.parent.bind("d", self.nextImage)  # press 'd' to go forward
 
-        # showing bbox info & delete bbox
+        # showing bbox info & delete bbox &
         self.lb1 = Label(self.frame, text='Bounding boxes:')
         self.lb1.grid(row=1, column=2, sticky=W + N)
         self.listbox = Listbox(self.frame, width=22, height=12)
-        self.listbox.grid(row=2, column=2, sticky=N)
+        self.listbox.grid(row=2, column=2, sticky=N + S)  # Resizable height, fixed width
         self.btnDel = Button(self.frame, text='Delete', command=self.delBBox)
         self.btnDel.grid(row=3, column=2, sticky=W + E + N)
         self.btnClear = Button(self.frame, text='ClearAll', command=self.clearBBox)
         self.btnClear.grid(row=4, column=2, sticky=W + E + N)
+        self.frame.grid_rowconfigure(2, weight=1)  # Make row 2 resizable
+        self.frame.grid_columnconfigure(2, weight=0, minsize=150)  # Fixed width
+
+        # control panel for bounding box type selection
+        self.typePanel = Frame(self.frame)
+        self.typePanel.grid(row=1, column=3, sticky=N + W)
+
+        # person button
+        self.personBtn = Button(self.typePanel, text='Person', command=lambda: self.setLabelType('person'))
+        self.personBtn.pack(side=TOP, pady=5)
+
+        # object selection
+        self.objectOptions = ['Car', 'Chair', 'Table', 'Lamp']  # Object definitions
+        self.selectedObject = StringVar(value=self.objectOptions[0])  # Default to the first option
+        self.objectDropdown = ttk.OptionMenu(
+            self.typePanel, self.selectedObject, self.objectOptions[0], *self.objectOptions, command=self.setObjectType
+        )
+        self.objectDropdown.pack(side=TOP, pady=5)
 
         # control panel for image navigation
         self.ctrPanel = Frame(self.frame)
@@ -196,21 +218,30 @@ class LabelTool():
                     if i == 0:
                         bbox_cnt = int(line.strip())
                         continue
-                    tmp = [int(t.strip()) for t in line.split()]
-                    self.bboxList.append(tuple(tmp))
-                    tmpId = self.mainPanel.create_rectangle(tmp[0], tmp[1], tmp[2], tmp[3], width=2,
-                                                            outline=COLORS[(len(self.bboxList) - 1) % len(COLORS)])
+                    tmp = line.strip().split()
+                    x1, y1, x2, y2 = map(int, tmp[:4])
+                    label_type = tmp[4] if len(tmp) > 4 else 'object'  # Default to 'object' if type is missing
+                    self.bboxList.append((x1, y1, x2, y2))
+                    self.bboxTypes.append(label_type)
+                    tmpId = self.mainPanel.create_rectangle(
+                        x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type=='person' else 'object']
+                    )
                     self.bboxIdList.append(tmpId)
-                    self.listbox.insert(END, '(%d, %d) -> (%d, %d)' % (tmp[0], tmp[1], tmp[2], tmp[3]))
-                    self.listbox.itemconfig(len(self.bboxIdList) - 1,
-                                            fg=COLORS[(len(self.bboxIdList) - 1) % len(COLORS)])
+                    self.listbox.insert(END, f'({x1}, {y1}) -> ({x2}, {y2}) [{label_type}]')
+                    self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[label_type if label_type=='person' else 'object'])
 
     def saveImage(self):
         with open(self.labelfilename, 'w') as f:
             f.write('%d\n' % len(self.bboxList))
-            for bbox in self.bboxList:
-                f.write(' '.join(map(str, bbox)) + '\n')
+            for i, bbox in enumerate(self.bboxList):
+                f.write(f'{bbox[0]} {bbox[1]} {bbox[2]} {bbox[3]} {self.bboxTypes[i]}\n')
         print('Image No. %d saved' % (self.cur))
+
+    def setLabelType(self, label_type):
+        self.STATE['label_type'] = label_type
+
+    def setObjectType(self, selection):
+        self.STATE['label_type'] = selection
 
     def mouseMove(self, event):
         # Calculate the scroll offset
@@ -238,25 +269,26 @@ class LabelTool():
             self.bboxId = self.mainPanel.create_rectangle(
                 self.STATE['x'], self.STATE['y'], x_offset, y_offset,
                 width=2,
-                outline=COLORS[len(self.bboxList) % len(COLORS)]
+                outline=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object']
             )
 
     def mouseClick(self, event):
-        # Calculate the scroll offset
         x_offset = int(self.mainPanel.canvasx(event.x))
         y_offset = int(self.mainPanel.canvasy(event.y))
-
         if self.STATE['click'] == 0:
             self.STATE['x'], self.STATE['y'] = x_offset, y_offset
         else:
+            if not self.STATE['label_type']:
+                print("Select a label type first (Person or Object).")
+                return
             x1, x2 = min(self.STATE['x'], x_offset), max(self.STATE['x'], x_offset)
             y1, y2 = min(self.STATE['y'], y_offset), max(self.STATE['y'], y_offset)
             self.bboxList.append((x1, y1, x2, y2))
+            self.bboxTypes.append(self.STATE['label_type'])
             self.bboxIdList.append(self.bboxId)
             self.bboxId = None
-            self.listbox.insert(END, f'({x1:.0f}, {y1:.0f}) -> ({x2:.0f}, {y2:.0f})')
-            self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[(len(self.bboxIdList) - 1) % len(COLORS)])
-
+            self.listbox.insert(END, f'({x1:.0f}, {y1:.0f}) -> ({x2:.0f}, {y2:.0f}) [{self.STATE["label_type"]}]')
+            self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object'])
         self.STATE['click'] = 1 - self.STATE['click']
 
     def cancelBBox(self, event):
