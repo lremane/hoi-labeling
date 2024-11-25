@@ -7,6 +7,8 @@
 #
 #-------------------------------------------------------------------------------
 from __future__ import division
+
+import json
 from tkinter import *
 from tkinter import ttk
 
@@ -56,6 +58,11 @@ class LabelTool():
         self.bboxTypes = []  # To store type information for bboxes
         self.hl = None
         self.vl = None
+
+        # Connection management
+        self.connectionLines = []
+        self.selected_indices = []  # To store selected indices for connections
+        self.connections = []  # To store connections
 
         # ----------------- GUI stuff ---------------------
         # dir entry & load
@@ -108,12 +115,16 @@ class LabelTool():
         self.personBtn.pack(side=TOP, pady=5)
 
         # object selection
-        self.objectOptions = ['Car', 'Chair', 'Table', 'Lamp']  # Object definitions
+        self.objectOptions = ['car', 'chair', 'table', 'lamp']  # Object definitions
         self.selectedObject = StringVar(value=self.objectOptions[0])  # Default to the first option
         self.objectDropdown = ttk.OptionMenu(
             self.typePanel, self.selectedObject, self.objectOptions[0], *self.objectOptions, command=self.setObjectType
         )
         self.objectDropdown.pack(side=TOP, pady=5)
+
+        # Add connection buttons
+        self.connectBtn = Button(self.typePanel, text='Select for \nConnection', command=self.selectForConnection)
+        self.connectBtn.pack(side=TOP, pady=5)
 
         # control panel for image navigation
         self.ctrPanel = Frame(self.frame)
@@ -148,19 +159,71 @@ class LabelTool():
         self.frame.columnconfigure(1, weight=1)
         self.frame.rowconfigure(1, weight=1)
 
+    def selectForConnection(self):
+        sel = self.listbox.curselection()
+        if len(sel) != 1:
+            print("Please select exactly one bounding box.")
+            return
+        idx = int(sel[0])
+        if idx in self.selected_indices:
+            print(f"Object {idx + 1} is already selected.")
+            return
+        self.selected_indices.append(idx)
+
+        # Apply high transparency color to the rectangle
+        bbox_id = self.bboxIdList[idx]
+        self.mainPanel.itemconfig(bbox_id, fill="blue", stipple="gray50")  # Adjust color and transparency
+
+        # Automatically save connection if two objects are selected
+        if len(self.selected_indices) == 2:
+            for bbox_id in self.bboxIdList:
+                self.mainPanel.itemconfig(bbox_id, fill="", stipple="")
+
+            sub, obj = self.selected_indices
+
+            # Draw the connection line
+            center1 = self.getBBoxCenter(self.bboxList[sub])
+            center2 = self.getBBoxCenter(self.bboxList[obj])
+            line_id = self.mainPanel.create_line(
+                center1[0], center1[1], center2[0], center2[1], fill="yellow", width=2
+            )
+            self.connectionLines.append(line_id)  # Track connection line
+
+            connection = {
+                "object_id": obj,
+                "interaction": "interacts_with",
+                "subject_id": sub
+            }
+            self.connections.append(connection)
+
+            self.selected_indices = []
+
+    def getBBoxCenter(self, bbox):
+        """
+        Helper function to calculate the center of a bounding box.
+        :param bbox: A tuple (x1, y1, x2, y2) representing the bounding box.
+        :return: A tuple (x_center, y_center).
+        """
+        x1, y1, x2, y2 = bbox
+        x_center = (x1 + x2) / 2
+        y_center = (y1 + y2) / 2
+        return x_center, y_center
+
     def loadDir(self, dbg=False):
         if not dbg:
             s = self.entry.get()
             self.parent.focus()
-            self.category = int(s)
+            self.category = int(1) # todo: ugly workaround
         else:
             s = r'D:\workspace\python\labelGUI'
         ##        if not os.path.isdir(s):
         ##            tkMessageBox.showerror("Error!", message = "The specified dir doesn't exist!")
         ##            return
         # get image list
-        self.imageDir = os.path.join(r'./Images', '%03d' % (self.category))
+        self.imageDir = os.path.join(r'./Images', '%03d' % self.category)
         self.imageList = glob.glob(os.path.join(self.imageDir, '*.JPEG'))
+        self.imageList.sort()
+        print(self.imageList)
         if len(self.imageList) == 0:
             print('No .JPEG images found in the specified dir!')
             return
@@ -208,34 +271,73 @@ class LabelTool():
 
         # load labels
         self.clearBBox()
-        self.imagename = os.path.split(imagepath)[-1].split('.')[0]
-        labelname = self.imagename + '.txt'
+        self.imagename = os.path.split(imagepath)[-1]
+        image_name_without_extension = os.path.split(imagepath)[-1].split('.')[0]
+        labelname = image_name_without_extension + '.txt'
         self.labelfilename = os.path.join(self.outDir, labelname)
-        bbox_cnt = 0
-        if os.path.exists(self.labelfilename):
-            with open(self.labelfilename) as f:
-                for (i, line) in enumerate(f):
-                    if i == 0:
-                        bbox_cnt = int(line.strip())
-                        continue
-                    tmp = line.strip().split()
-                    x1, y1, x2, y2 = map(int, tmp[:4])
-                    label_type = tmp[4] if len(tmp) > 4 else 'object'  # Default to 'object' if type is missing
-                    self.bboxList.append((x1, y1, x2, y2))
-                    self.bboxTypes.append(label_type)
-                    tmpId = self.mainPanel.create_rectangle(
-                        x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type=='person' else 'object']
-                    )
-                    self.bboxIdList.append(tmpId)
-                    self.listbox.insert(END, f'({x1}, {y1}) -> ({x2}, {y2}) [{label_type}]')
-                    self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[label_type if label_type=='person' else 'object'])
+        if not os.path.exists(self.labelfilename):
+            return
+
+        with open(self.labelfilename, 'r') as file:
+            data = json.load(file)
+
+        # load bounding boxes
+        for gtbox in data["gtboxes"]:
+            x1, y1, height, width = map(int, gtbox["box"])
+            x2, y2 = x1 + width - 1, y1 + height - 1
+            self.bboxList.append((x1, y1, x2, y2))
+            label_type = gtbox["tag"]
+            self.bboxTypes.append(label_type)
+            tmpId = self.mainPanel.create_rectangle(
+                x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
+            )
+            self.bboxIdList.append(tmpId)
+            self.listbox.insert(END, f'[{label_type}]')
+            self.listbox.itemconfig(len(self.bboxIdList) - 1,
+                                    fg=COLORS[label_type if label_type == 'person' else 'object'])
+
+        # loading connections
+        for conn in data["hoi"]:
+            sub = conn['subject_id']
+            obj = conn['object_id']
+
+            center1 = self.getBBoxCenter(self.bboxList[sub])
+            center2 = self.getBBoxCenter(self.bboxList[obj])
+
+            line_id = self.mainPanel.create_line(
+                center1[0], center1[1], center2[0], center2[1], fill="yellow", width=2
+            )
+            self.connectionLines.append(line_id)  # Track connection line
+
+            connection = {
+                "object_id": obj,
+                "interaction": "interacts_with",
+                "subject_id": sub
+            }
+            self.connections.append(connection)
 
     def saveImage(self):
+        data = {
+            "filename": self.imagename,
+            "height": self.img.height,
+            "width": self.img.width,
+            "gtboxes": [
+                {
+                    "tag": self.bboxTypes[i],
+                    "box": [x_min, y_min, width, height]
+                }
+                for i, bbox in enumerate(self.bboxList)
+                for x_min, y_min, x_max, y_max in [bbox]
+                for width, height in [(x_max - x_min + 1, y_max - y_min + 1)]
+            ],
+            "hoi": self.connections
+        }
+
+        print(data)
         with open(self.labelfilename, 'w') as f:
-            f.write('%d\n' % len(self.bboxList))
-            for i, bbox in enumerate(self.bboxList):
-                f.write(f'{bbox[0]} {bbox[1]} {bbox[2]} {bbox[3]} {self.bboxTypes[i]}\n')
-        print('Image No. %d saved' % (self.cur))
+            json.dump(data, f, indent=4)
+
+        print('Image No. %d saved' % self.cur)
 
     def setLabelType(self, label_type):
         self.STATE['label_type'] = label_type
@@ -287,7 +389,7 @@ class LabelTool():
             self.bboxTypes.append(self.STATE['label_type'])
             self.bboxIdList.append(self.bboxId)
             self.bboxId = None
-            self.listbox.insert(END, f'({x1:.0f}, {y1:.0f}) -> ({x2:.0f}, {y2:.0f}) [{self.STATE["label_type"]}]')
+            self.listbox.insert(END, f'[{self.STATE["label_type"]}]')
             self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object'])
         self.STATE['click'] = 1 - self.STATE['click']
 
@@ -309,11 +411,17 @@ class LabelTool():
         self.listbox.delete(idx)
 
     def clearBBox(self):
+        # Clear bounding boxes
         for idx in range(len(self.bboxIdList)):
             self.mainPanel.delete(self.bboxIdList[idx])
         self.listbox.delete(0, len(self.bboxList))
         self.bboxIdList = []
         self.bboxList = []
+
+        # Clear connection lines
+        for line in self.connectionLines:
+            self.mainPanel.delete(line)
+        self.connectionLines = []
 
     def prevImage(self, event=None):
         self.saveImage()
@@ -329,18 +437,10 @@ class LabelTool():
 
     def gotoImage(self):
         idx = int(self.idxEntry.get())
-        if 1 <= idx and idx <= self.total:
+        if 1 <= idx <= self.total:
             self.saveImage()
             self.cur = idx
             self.loadImage()
-
-
-##    def setImage(self, imagepath = r'test2.png'):
-##        self.img = Image.open(imagepath)
-##        self.tkimg = ImageTk.PhotoImage(self.img)
-##        self.mainPanel.config(width = self.tkimg.width())
-##        self.mainPanel.config(height = self.tkimg.height())
-##        self.mainPanel.create_image(0, 0, image = self.tkimg, anchor=NW)
 
 if __name__ == '__main__':
     root = Tk()
