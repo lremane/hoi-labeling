@@ -159,6 +159,19 @@ class LabelTool():
         self.frame.columnconfigure(1, weight=1)
         self.frame.rowconfigure(1, weight=1)
 
+        # showing connection info & delete connection
+        self.lbConnections = Label(self.frame, text='Connections:')
+        self.lbConnections.grid(row=1, column=4, sticky=W + N)
+        self.connectionListbox = Listbox(self.frame, width=22, height=12)
+        self.connectionListbox.grid(row=2, column=4, sticky=N + S)
+        self.delConnectionBtn = Button(self.frame, text='Delete Connection', command=self.delConnection)
+        self.delConnectionBtn.grid(row=3, column=4, sticky=W + E + N)
+        self.frame.grid_columnconfigure(4, weight=0, minsize=150)  # Fixed width for connections column
+
+        # Display filename
+        self.filenameLabel = Label(self.ctrPanel, text="Filename: ", anchor=W)
+        self.filenameLabel.pack(side=LEFT, padx=5)
+
     def selectForConnection(self):
         sel = self.listbox.curselection()
         if len(sel) != 1:
@@ -187,16 +200,33 @@ class LabelTool():
             line_id = self.mainPanel.create_line(
                 center1[0], center1[1], center2[0], center2[1], fill="yellow", width=2
             )
-            self.connectionLines.append(line_id)  # Track connection line
+            self.connectionLines.append(line_id)
 
+            # Add to connections and connectionListbox
             connection = {
                 "object_id": obj,
                 "interaction": "interacts_with",
                 "subject_id": sub
             }
             self.connections.append(connection)
+            self.connectionListbox.insert(END, f"[{sub} -> {obj}]")
 
             self.selected_indices = []
+
+    def delConnection(self):
+        sel = self.connectionListbox.curselection()
+        if len(sel) != 1:
+            print("Please select exactly one connection to delete.")
+            return
+        idx = int(sel[0])
+
+        # Remove the connection line from the canvas
+        self.mainPanel.delete(self.connectionLines[idx])
+        self.connectionLines.pop(idx)
+
+        # Remove the connection from the data and listbox
+        self.connections.pop(idx)
+        self.connectionListbox.delete(idx)
 
     def getBBoxCenter(self, bbox):
         """
@@ -315,6 +345,8 @@ class LabelTool():
                 "subject_id": sub
             }
             self.connections.append(connection)
+            self.connectionListbox.insert(END, f"[{sub} -> {obj}]")
+
 
     def saveImage(self):
         data = {
@@ -418,10 +450,12 @@ class LabelTool():
         self.bboxIdList = []
         self.bboxList = []
 
-        # Clear connection lines
+        # Clear connections
         for line in self.connectionLines:
             self.mainPanel.delete(line)
         self.connectionLines = []
+        self.connectionListbox.delete(0, len(self.connections))
+        self.connections = []
 
     def prevImage(self, event=None):
         self.saveImage()
