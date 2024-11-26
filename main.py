@@ -35,8 +35,6 @@ class LabelTool():
         # initialize global state
         self.imageDir = ''
         self.imageList = []
-        self.egDir = ''
-        self.egList = []
         self.outDir = ''
         self.cur = 0
         self.total = 0
@@ -141,16 +139,6 @@ class LabelTool():
         self.idxEntry.pack(side=LEFT)
         self.goBtn = Button(self.ctrPanel, text='Go', command=self.gotoImage)
         self.goBtn.pack(side=LEFT)
-
-        # example panel for illustration
-        self.egPanel = Frame(self.frame, border=10)
-        self.egPanel.grid(row=1, column=0, rowspan=5, sticky=N)
-        self.tmpLabel2 = Label(self.egPanel, text="Examples:")
-        self.tmpLabel2.pack(side=TOP, pady=5)
-        self.egLabels = []
-        for i in range(3):
-            self.egLabels.append(Label(self.egPanel))
-            self.egLabels[-1].pack(side=TOP)
 
         # display mouse position
         self.disp = Label(self.ctrPanel, text='')
@@ -266,24 +254,6 @@ class LabelTool():
         self.outDir = os.path.join(r'./Labels', '%03d' % (self.category))
         if not os.path.exists(self.outDir):
             os.mkdir(self.outDir)
-
-        # load example bboxes
-        self.egDir = os.path.join(r'./Examples', '%03d' % (self.category))
-        if not os.path.exists(self.egDir):
-            return
-        filelist = glob.glob(os.path.join(self.egDir, '*.JPEG'))
-        self.tmp = []
-        self.egList = []
-        random.shuffle(filelist)
-        for (i, f) in enumerate(filelist):
-            if i == 3:
-                break
-            im = Image.open(f)
-            r = min(SIZE[0] / im.size[0], SIZE[1] / im.size[1])
-            new_size = int(r * im.size[0]), int(r * im.size[1])
-            self.tmp.append(im.resize(new_size, Image.Resampling.LANCZOS))
-            self.egList.append(ImageTk.PhotoImage(self.tmp[-1]))
-            self.egLabels[i].config(image=self.egList[-1], width=SIZE[0], height=SIZE[1])
 
         self.loadImage()
         print('%d images loaded from %s' % (self.total, s))
