@@ -8,6 +8,7 @@
 #-------------------------------------------------------------------------------
 from __future__ import division
 
+import argparse
 import json
 from tkinter import *
 from tkinter import ttk
@@ -15,12 +16,13 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import os
 import glob
-import random
+
+parser = argparse.ArgumentParser(description="Object bounding box label tool")
+parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+args = parser.parse_args()
 
 # colors for the bboxes
 COLORS = {'person': 'red', 'object': 'blue'}
-# image sizes for the examples
-SIZE = 256, 256
 
 
 class LabelTool():
@@ -97,7 +99,7 @@ class LabelTool():
         self.lb1.grid(row=1, column=2, sticky=W + N)
         self.listbox = Listbox(self.frame, width=22, height=12)
         self.listbox.grid(row=2, column=2, sticky=N + S)  # Resizable height, fixed width
-        self.btnDel = Button(self.frame, text='Delete', command=self.delBBox)
+        self.btnDel = Button(self.frame, text='Delete Object', command=self.delBBox)
         self.btnDel.grid(row=3, column=2, sticky=W + E + N)
         self.btnClear = Button(self.frame, text='ClearAll', command=self.clearBBox)
         self.btnClear.grid(row=4, column=2, sticky=W + E + N)
@@ -114,15 +116,20 @@ class LabelTool():
 
         # object selection
         self.objectOptions = ['car', 'chair', 'table', 'lamp']  # Object definitions
-        self.selectedObject = StringVar(value=self.objectOptions[0])  # Default to the first option
         self.objectDropdown = ttk.OptionMenu(
-            self.typePanel, self.selectedObject, self.objectOptions[0], *self.objectOptions, command=self.setObjectType
+            self.typePanel, StringVar(value='Object'), None, *self.objectOptions, command=self.setObjectType
         )
         self.objectDropdown.pack(side=TOP, pady=5)
 
         # Add connection buttons
         self.connectBtn = Button(self.typePanel, text='Select for \nConnection', command=self.selectForConnection)
         self.connectBtn.pack(side=TOP, pady=5)
+
+        self.connectionOptions = ['sit_on', 'drink', 'work_on']
+        self.connectionDropdown = ttk.OptionMenu(
+            self.typePanel, StringVar(value='Save Connection'), None, *self.connectionOptions, command=self.save_connection
+        )
+        self.connectionDropdown.pack(side=TOP, pady=5)
 
         # control panel for image navigation
         self.ctrPanel = Frame(self.frame)
@@ -162,12 +169,14 @@ class LabelTool():
 
     def selectForConnection(self):
         sel = self.listbox.curselection()
-        if len(sel) != 1:
+        if len(sel) != 1 or len(self.selected_indices) == 2:
             print("Please select exactly one bounding box.")
             return
         idx = int(sel[0])
         if idx in self.selected_indices:
-            print(f"Object {idx + 1} is already selected.")
+            bbox_id = self.bboxIdList[idx]
+            self.mainPanel.itemconfig(bbox_id, fill="", stipple="")  # Adjust color and transparency
+            self.selected_indices.remove(idx)
             return
         self.selected_indices.append(idx)
 
@@ -175,7 +184,7 @@ class LabelTool():
         bbox_id = self.bboxIdList[idx]
         self.mainPanel.itemconfig(bbox_id, fill="blue", stipple="gray50")  # Adjust color and transparency
 
-        # Automatically save connection if two objects are selected
+    def save_connection(self, connection_type):
         if len(self.selected_indices) == 2:
             for bbox_id in self.bboxIdList:
                 self.mainPanel.itemconfig(bbox_id, fill="", stipple="")
@@ -193,12 +202,14 @@ class LabelTool():
             # Add to connections and connectionListbox
             connection = {
                 "object_id": obj,
-                "interaction": "interacts_with",
+                "interaction": connection_type,
                 "subject_id": sub
             }
-            self.connections.append(connection)
-            self.connectionListbox.insert(END, f"[{sub} -> {obj}]")
 
+            self.connections.append(connection)
+            self.connectionListbox.insert(END, f"[{sub} - {connection_type} - {obj}]")
+
+            self.STATE['connection'] = None
             self.selected_indices = []
 
     def delConnection(self):
@@ -227,21 +238,17 @@ class LabelTool():
         y_center = (y1 + y2) / 2
         return x_center, y_center
 
-    def loadDir(self, dbg=False):
-        if not dbg:
-            s = self.entry.get()
-            self.parent.focus()
-            self.category = int(1) # todo: ugly workaround
+    def loadDir(self):
+        if args.debug:
+            image_directory = './Images/001'
+
         else:
-            s = r'D:\workspace\python\labelGUI'
-        ##        if not os.path.isdir(s):
-        ##            tkMessageBox.showerror("Error!", message = "The specified dir doesn't exist!")
-        ##            return
-        # get image list
-        self.imageDir = os.path.join(r'./Images', '%03d' % self.category)
-        self.imageList = glob.glob(os.path.join(self.imageDir, '*.JPEG'))
+            image_directory = self.entry.get()
+            self.parent.focus()
+
+        self.imageDir = image_directory
+        self.imageList = glob.glob(os.path.join(self.imageDir, '*.jpg'))
         self.imageList.sort()
-        print(self.imageList)
         if len(self.imageList) == 0:
             print('No .JPEG images found in the specified dir!')
             return
@@ -251,14 +258,16 @@ class LabelTool():
         self.total = len(self.imageList)
 
         # set up output dir
-        self.outDir = os.path.join(r'./Labels', '%03d' % (self.category))
+        self.outDir = './Labels'
         if not os.path.exists(self.outDir):
             os.mkdir(self.outDir)
 
         self.loadImage()
-        print('%d images loaded from %s' % (self.total, s))
 
     def loadImage(self):
+        # empty bboxes
+        self.bboxTypes = []
+
         # load image
         imagepath = self.imageList[self.cur - 1]
         self.img = Image.open(imagepath)
@@ -268,6 +277,10 @@ class LabelTool():
         self.mainPanel.config(scrollregion=(0, 0, self.tkimg.width(), self.tkimg.height()))
         self.mainPanel.create_image(0, 0, image=self.tkimg, anchor=NW)
         self.progLabel.config(text="%04d/%04d" % (self.cur, self.total))
+
+        # Update filename label
+        self.imagename = os.path.split(imagepath)[-1]
+        self.filenameLabel.config(text=f"Filename: {self.imagename}")
 
         # load labels
         self.clearBBox()
@@ -283,7 +296,7 @@ class LabelTool():
 
         # load bounding boxes
         for gtbox in data["gtboxes"]:
-            x1, y1, height, width = map(int, gtbox["box"])
+            x1, y1, width, height = map(int, gtbox["box"])
             x2, y2 = x1 + width - 1, y1 + height - 1
             self.bboxList.append((x1, y1, x2, y2))
             label_type = gtbox["tag"]
@@ -300,6 +313,7 @@ class LabelTool():
         for conn in data["hoi"]:
             sub = conn['subject_id']
             obj = conn['object_id']
+            interaction = conn['interaction']
 
             center1 = self.getBBoxCenter(self.bboxList[sub])
             center2 = self.getBBoxCenter(self.bboxList[obj])
@@ -311,11 +325,11 @@ class LabelTool():
 
             connection = {
                 "object_id": obj,
-                "interaction": "interacts_with",
+                "interaction": interaction,
                 "subject_id": sub
             }
             self.connections.append(connection)
-            self.connectionListbox.insert(END, f"[{sub} -> {obj}]")
+            self.connectionListbox.insert(END, f"[{sub} - {interaction} - {obj}]")
 
 
     def saveImage(self):
