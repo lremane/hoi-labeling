@@ -202,6 +202,7 @@ class LabelTool():
         if len(sel) != 1 or len(self.selected_indices) == 2:
             print("Please select exactly one bounding box.")
             return
+
         idx = int(sel[0])
         if idx in self.selected_indices:
             bbox_id = self.bboxIdList[idx]
@@ -270,7 +271,7 @@ class LabelTool():
 
     def loadDir(self):
         if args.debug:
-            image_directory = './Images/2fps'
+            image_directory = 'Images/2fps'
 
         else:
             image_directory = self.entry.get()
@@ -320,8 +321,6 @@ class LabelTool():
         image_name_without_extension = os.path.split(imagepath)[-1].split('.')[0]
         labelname = image_name_without_extension + '.txt'
         self.labelfilename = os.path.join(self.outDir, labelname)
-        if not os.path.exists(self.labelfilename):
-            return
 
         if prev:
             prev_image_path = self.imageList[self.cur - 2]
@@ -331,6 +330,9 @@ class LabelTool():
             load_filename = prev_label_file_name
         else:
             load_filename = self.labelfilename
+
+        if not os.path.exists(load_filename):
+            return
 
         with open(load_filename, 'r') as file:
             data = json.load(file)
@@ -346,8 +348,8 @@ class LabelTool():
                 x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
             )
             self.bboxIdList.append(tmpId)
-            # self.listbox.insert(END, f'[{index}][{label_type}]')
-            self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
+            self.listbox.insert(END, f'[{index}][{label_type}]')
+            # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
             self.listbox.itemconfig(len(self.bboxIdList) - 1,
                                     fg=COLORS[label_type if label_type == 'person' else 'object'])
 
@@ -464,7 +466,8 @@ class LabelTool():
                 self.bboxTypes.append(self.STATE['label_type'])
                 self.bboxIdList.append(self.bboxId)
                 self.bboxId = None
-                self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
+                self.listbox.insert(END, f'[{len(self.bboxList) - 1}][{self.STATE['label_type']}')
+                # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
                 self.listbox.itemconfig(
                     len(self.bboxIdList) - 1,
                     fg=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object']
@@ -572,7 +575,8 @@ class LabelTool():
 
             # Update the listbox display
             self.listbox.delete(item_index)
-            self.listbox.insert(item_index, f'[{int(x1)} {int(y1)} {int(x2)} {int(y2)}]')
+            self.listbox.insert(item_index, f'[{item_index}][{self.bboxTypes[item_index]}]')
+            # self.listbox.insert(item_index, f'[{int(x1)} {int(y1)} {int(x2)} {int(y2)}]')
             self.listbox.itemconfig(
                 item_index,
                 fg=COLORS[self.bboxTypes[item_index] if self.bboxTypes[item_index] == 'person' else 'object']
