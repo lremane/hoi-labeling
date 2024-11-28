@@ -10,6 +10,7 @@ from __future__ import division
 
 import argparse
 import json
+from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 
@@ -92,7 +93,7 @@ class LabelTool():
         self.parent.bind("<Escape>", self.cancelBBox)  # press <Escape> to cancel current bbox
         self.parent.bind("s", self.cancelBBox)
         self.parent.bind("a", self.prevImage)  # press 'a' to go backward
-        self.parent.bind("d", self.nextImage)  # press 'd' to go forward
+        self.parent.bind("f", self.nextImage)  # press 'f' to go forward
 
         # showing bbox info & delete bbox &
         self.lb1 = Label(self.frame, text='Bounding boxes:')
@@ -115,7 +116,13 @@ class LabelTool():
         self.personBtn.pack(side=TOP, pady=5)
 
         # object selection
-        self.objectOptions = ['car', 'chair', 'table', 'lamp']  # Object definitions
+        self.objectOptions = (
+                ['cell_phone'] +
+                ['cup', 'bottle'] +
+                ['couch'] +
+                ['apple'] +
+                ['book']
+        )
         self.objectDropdown = ttk.OptionMenu(
             self.typePanel, StringVar(value='Object'), None, *self.objectOptions, command=self.setObjectType
         )
@@ -125,7 +132,13 @@ class LabelTool():
         self.connectBtn = Button(self.typePanel, text='Select for \nConnection', command=self.selectForConnection)
         self.connectBtn.pack(side=TOP, pady=5)
 
-        self.connectionOptions = ['sit_on', 'drink', 'work_on']
+        self.connectionOptions = (['no_interaction'] +
+                                  ['talk_on', 'text_on'] +
+                                  ['drink_with'] +
+                                  ['lie_on', 'sit_on'] +
+                                  ['eat'] + # hold
+                                  ['read'] # hold -> erstmal nicht labeln
+        )
         self.connectionDropdown = ttk.OptionMenu(
             self.typePanel, StringVar(value='Save Connection'), None, *self.connectionOptions, command=self.save_connection
         )
@@ -247,10 +260,10 @@ class LabelTool():
             self.parent.focus()
 
         self.imageDir = image_directory
-        self.imageList = glob.glob(os.path.join(self.imageDir, '*.jpg'))
+        self.imageList = glob.glob(os.path.join(self.imageDir, '*.png'))
         self.imageList.sort()
         if len(self.imageList) == 0:
-            print('No .JPEG images found in the specified dir!')
+            print('No .png images found in the specified dir!')
             return
 
         # default to the 1st image in the collection
@@ -258,7 +271,12 @@ class LabelTool():
         self.total = len(self.imageList)
 
         # set up output dir
-        self.outDir = './Labels'
+        if self.imageDir.startswith("Images"):
+            self.outDir = self.imageDir.replace("Images", "Labels", 1)
+        else:
+            self.outDir = "Labels"
+
+        print(self.outDir)
         if not os.path.exists(self.outDir):
             os.mkdir(self.outDir)
 
