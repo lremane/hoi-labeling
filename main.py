@@ -197,6 +197,11 @@ class LabelTool():
         self.mainPanel.bind("<B1-Motion>", self.on_drag_motion)
         self.mainPanel.bind("<ButtonRelease-1>", self.on_drag_end)
 
+        # images resizing
+        self.resize_mode = False
+        self.resize_data = {"x": 0, "y": 0, "item": None, "corner": None}
+        self.resize_threshold = 10  # Pixels
+
     def selectForConnection(self):
         sel = self.listbox.curselection()
         if len(sel) != 1 or len(self.selected_indices) == 2:
@@ -271,7 +276,7 @@ class LabelTool():
 
     def loadDir(self):
         if args.debug:
-            image_directory = 'Images/2fps'
+            image_directory = 'Images/001'
 
         else:
             image_directory = self.entry.get()
@@ -386,7 +391,7 @@ class LabelTool():
             "gtboxes": [
                 {
                     "tag": self.bboxTypes[i],
-                    "box": [x_min, y_min, width, height]
+                    "box": [int(x_min), int(y_min), int(width), int(height)]
                 }
                 for i, bbox in enumerate(self.bboxList)
                 for x_min, y_min, x_max, y_max in [bbox]
@@ -437,20 +442,35 @@ class LabelTool():
             )
 
     def mouseClick(self, event):
-        """Handle mouse click to either start drawing a new box or dragging an existing one."""
         x_offset = int(self.mainPanel.canvasx(event.x))
         y_offset = int(self.mainPanel.canvasy(event.y))
 
         if self.drag_mode:
-            # If in drag mode, check if the click is on an existing rectangle
             for bbox_id in self.bboxIdList:
                 coords = self.mainPanel.coords(bbox_id)
-                if coords[0] <= x_offset <= coords[2] and coords[1] <= y_offset <= coords[3]:
-                    # Start dragging the rectangle
+                x1, y1, x2, y2 = coords
+
+                # Check if the click is near any corner
+                corners = {
+                    "top_left": (x1, y1),
+                    "top_right": (x2, y1),
+                    "bottom_left": (x1, y2),
+                    "bottom_right": (x2, y2)
+                }
+
+                for corner_name, (cx, cy) in corners.items():
+                    if abs(cx - x_offset) <= self.resize_threshold and abs(cy - y_offset) <= self.resize_threshold:
+                        # Start resizing
+                        self.resize_mode = True
+                        self.resize_data = {"x": x_offset, "y": y_offset, "item": bbox_id, "corner": corner_name}
+                        return
+
+                # Start dragging if click is within the rectangle
+                if x1 <= x_offset <= x2 and y1 <= y_offset <= y2:
                     self.drag_data["item"] = bbox_id
                     self.drag_data["x"] = x_offset
                     self.drag_data["y"] = y_offset
-                    return  # Skip creating a new rectangle
+                    return
         else:
             # If not in drag mode, handle drawing a new rectangle
             if self.STATE['click'] == 0:
@@ -551,9 +571,30 @@ class LabelTool():
             self.moveModeBtn.config(relief=RAISED, text="Move BBox")
 
     def on_drag_motion(self, event):
-        """Handle the motion of dragging."""
-        if self.drag_data["item"] is not None:
-            x, y = self.mainPanel.canvasx(event.x), self.mainPanel.canvasy(event.y)
+        x, y = self.mainPanel.canvasx(event.x), self.mainPanel.canvasy(event.y)
+
+        if self.resize_mode and self.resize_data["item"] is not None:
+            item_index = self.bboxIdList.index(self.resize_data["item"])
+            x1, y1, x2, y2 = self.mainPanel.coords(self.resize_data["item"])
+
+            # Update coordinates based on the corner being dragged
+            corner = self.resize_data["corner"]
+            if corner == "top_left":
+                x1, y1 = x, y
+            elif corner == "top_right":
+                x2, y1 = x, y
+            elif corner == "bottom_left":
+                x1, y2 = x, y
+            elif corner == "bottom_right":
+                x2, y2 = x, y
+
+            # Update the rectangle on the canvas
+            self.mainPanel.coords(self.resize_data["item"], x1, y1, x2, y2)
+
+            # Update bounding box list
+            self.bboxList[item_index] = (x1, y1, x2, y2)
+
+        elif self.drag_data["item"] is not None:
             dx, dy = x - self.drag_data["x"], y - self.drag_data["y"]
 
             # Move the rectangle
@@ -564,25 +605,20 @@ class LabelTool():
             self.drag_data["y"] = y
 
     def on_drag_end(self, event):
-        """End the dragging process and update coordinates."""
-        if self.drag_data["item"] is not None:
-            x, y = self.mainPanel.canvasx(event.x), self.mainPanel.canvasy(event.y)
-
-            # Update the bounding box list
-            item_index = self.bboxIdList.index(self.drag_data["item"])
+        if self.resize_mode:
+            self.resize_mode = False
+            self.resize_data = {"x": 0, "y": 0, "item": None, "corner": None}
+        elif self.drag_data["item"] is not None:
             x1, y1, x2, y2 = self.mainPanel.coords(self.drag_data["item"])
+            item_index = self.bboxIdList.index(self.drag_data["item"])
             self.bboxList[item_index] = (x1, y1, x2, y2)
 
-            # Update the listbox display
             self.listbox.delete(item_index)
             self.listbox.insert(item_index, f'[{item_index}][{self.bboxTypes[item_index]}]')
-            # self.listbox.insert(item_index, f'[{int(x1)} {int(y1)} {int(x2)} {int(y2)}]')
             self.listbox.itemconfig(
                 item_index,
                 fg=COLORS[self.bboxTypes[item_index] if self.bboxTypes[item_index] == 'person' else 'object']
             )
-
-            # Reset drag data
             self.drag_data = {"x": 0, "y": 0, "item": None}
 
 
