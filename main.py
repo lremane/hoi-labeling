@@ -12,7 +12,7 @@ import argparse
 import json
 from pathlib import Path
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from PIL import Image, ImageTk
 import os
@@ -102,7 +102,7 @@ class LabelTool():
         self.listbox.grid(row=2, column=2, sticky=N + S)  # Resizable height, fixed width
         self.btnDel = Button(self.frame, text='Delete Object', command=self.delBBox)
         self.btnDel.grid(row=3, column=2, sticky=W + E + N)
-        self.btnClear = Button(self.frame, text='ClearAll', command=self.clearBBox)
+        self.btnClear = Button(self.frame, text='ClearAll', command=self.clear_all_btn)
         self.btnClear.grid(row=4, column=2, sticky=W + E + N)
         self.frame.grid_rowconfigure(2, weight=1)  # Make row 2 resizable
         self.frame.grid_columnconfigure(2, weight=0, minsize=150)  # Fixed width
@@ -159,6 +159,9 @@ class LabelTool():
         self.idxEntry.pack(side=LEFT)
         self.goBtn = Button(self.ctrPanel, text='Go', command=self.gotoImage)
         self.goBtn.pack(side=LEFT)
+
+        self.nextWithAnnotationsBtn = Button(self.ctrPanel, text='Next wA >>', width=10, command=self.nextWithAnnotationsImage)
+        self.nextWithAnnotationsBtn.pack(side=LEFT, padx=5, pady=3)
 
         # display mouse position
         self.disp = Label(self.ctrPanel, text='')
@@ -253,7 +256,7 @@ class LabelTool():
 
     def loadDir(self):
         if args.debug:
-            image_directory = './Images/001'
+            image_directory = './Images/2fps'
 
         else:
             image_directory = self.entry.get()
@@ -282,10 +285,7 @@ class LabelTool():
 
         self.loadImage()
 
-    def loadImage(self):
-        # empty bboxes
-        self.bboxTypes = []
-
+    def loadImage(self, prev=False):
         # load image
         imagepath = self.imageList[self.cur - 1]
         self.img = Image.open(imagepath)
@@ -301,7 +301,7 @@ class LabelTool():
         self.filenameLabel.config(text=f"Filename: {self.imagename}")
 
         # load labels
-        self.clearBBox()
+        self.clear_all()
         self.imagename = os.path.split(imagepath)[-1]
         image_name_without_extension = os.path.split(imagepath)[-1].split('.')[0]
         labelname = image_name_without_extension + '.txt'
@@ -309,11 +309,20 @@ class LabelTool():
         if not os.path.exists(self.labelfilename):
             return
 
-        with open(self.labelfilename, 'r') as file:
+        if prev:
+            prev_image_path = self.imageList[self.cur -2]
+            prev_image_name_without_extension = os.path.split(prev_image_path)[-1].split('.')[0]
+            prev_label_name = prev_image_name_without_extension + '.txt'
+            prev_label_file_name = os.path.join(self.outDir, prev_label_name)
+            load_filename = prev_label_file_name
+        else:
+            load_filename = self.labelfilename
+
+        with open(load_filename, 'r') as file:
             data = json.load(file)
 
         # load bounding boxes
-        for gtbox in data["gtboxes"]:
+        for index, gtbox in enumerate(data["gtboxes"]):
             x1, y1, width, height = map(int, gtbox["box"])
             x2, y2 = x1 + width - 1, y1 + height - 1
             self.bboxList.append((x1, y1, x2, y2))
@@ -323,7 +332,7 @@ class LabelTool():
                 x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
             )
             self.bboxIdList.append(tmpId)
-            self.listbox.insert(END, f'[{label_type}]')
+            self.listbox.insert(END, f'[{index}][{label_type}]')
             self.listbox.itemconfig(len(self.bboxIdList) - 1,
                                     fg=COLORS[label_type if label_type == 'person' else 'object'])
 
@@ -349,6 +358,9 @@ class LabelTool():
             self.connections.append(connection)
             self.connectionListbox.insert(END, f"[{sub} - {interaction} - {obj}]")
 
+        print("-----------------------------------------------------------")
+        print(f"conn: {self.connections}")
+
 
     def saveImage(self):
         data = {
@@ -367,11 +379,11 @@ class LabelTool():
             "hoi": self.connections
         }
 
-        print(data)
+        print(f"saved data: {data}")
         with open(self.labelfilename, 'w') as f:
             json.dump(data, f, indent=4)
 
-        print('Image No. %d saved' % self.cur)
+        # print('Image No. %d saved' % self.cur)
 
     def setLabelType(self, label_type):
         self.STATE['label_type'] = label_type
@@ -423,7 +435,7 @@ class LabelTool():
             self.bboxTypes.append(self.STATE['label_type'])
             self.bboxIdList.append(self.bboxId)
             self.bboxId = None
-            self.listbox.insert(END, f'[{self.STATE["label_type"]}]')
+            self.listbox.insert(END, f'[{len(self.bboxTypes) - 1}][{self.STATE["label_type"]}]')
             self.listbox.itemconfig(len(self.bboxIdList) - 1, fg=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object'])
         self.STATE['click'] = 1 - self.STATE['click']
 
@@ -444,7 +456,18 @@ class LabelTool():
         self.bboxList.pop(idx)
         self.listbox.delete(idx)
 
-    def clearBBox(self):
+    def clear_all_btn(self):
+        # Show a confirmation dialog before clearing
+        confirm = messagebox.askyesno("Confirmation", "Are you sure you want to clear all bounding boxes?")
+        if not confirm:
+            return
+
+        self.clear_all()
+
+    def clear_all(self):
+        # empty bboxes
+        self.bboxTypes = []
+
         # Clear bounding boxes
         for idx in range(len(self.bboxIdList)):
             self.mainPanel.delete(self.bboxIdList[idx])
@@ -470,6 +493,12 @@ class LabelTool():
         if self.cur < self.total:
             self.cur += 1
             self.loadImage()
+
+    def nextWithAnnotationsImage(self, event=None):
+        self.saveImage()
+        if self.cur < self.total:
+            self.cur += 1
+            self.loadImage(prev=True)
 
     def gotoImage(self):
         idx = int(self.idxEntry.get())
