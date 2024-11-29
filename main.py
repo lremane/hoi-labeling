@@ -118,7 +118,7 @@ class LabelTool():
 
         # object selection
         self.objectOptions = (
-                ['cell_phone'] +
+                ['cell phone'] +
                 ['cup', 'bottle'] +
                 ['couch'] +
                 ['apple'] +
@@ -406,7 +406,7 @@ class LabelTool():
 
 
         data = {
-            "filename": self.imagename,
+            "file_name": self.imagename,
             "height": self.img.height,
             "width": self.img.width,
             "gtboxes": [
