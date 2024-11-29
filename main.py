@@ -18,7 +18,7 @@ import os
 import glob
 
 parser = argparse.ArgumentParser(description="Object bounding box label tool")
-parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+parser.add_argument("--debug", type=str, default='', help="Enable debug mode or specify debug options")
 args = parser.parse_args()
 
 # colors for the bboxes
@@ -93,6 +93,8 @@ class LabelTool():
         self.parent.bind("s", self.cancelBBox)
         self.parent.bind("a", self.prevImage)  # press 'a' to go backward
         self.parent.bind("f", self.nextImage)  # press 'f' to go forward
+        self.parent.bind("t", self.nextWithAnnotationsImage) # press 't' to move annotation to next image
+
 
         # showing bbox info & delete bbox &
         self.lb1 = Label(self.frame, text='Bounding boxes:')
@@ -131,7 +133,7 @@ class LabelTool():
         self.connectBtn = Button(self.typePanel, text='Select for \nConnection', command=self.selectForConnection)
         self.connectBtn.pack(side=TOP, pady=5)
 
-        self.connectionOptions = (['no_interaction'] +
+        self.connectionOptions = (['no_interaction', 'hold'] +
                                   ['talk_on', 'text_on'] +
                                   ['drink_with'] +
                                   ['lie_on', 'sit_on'] +
@@ -180,6 +182,9 @@ class LabelTool():
         self.delConnectionBtn.grid(row=3, column=4, sticky=W + E + N)
         self.frame.grid_columnconfigure(4, weight=0, minsize=150)  # Fixed width for connections column
 
+        self.del_all_connections_btn = Button(self.frame, text='Delete All Connections', command=self.clear_all_connections)
+        self.del_all_connections_btn.grid(row=4, column=4, sticky=W + E + N)
+
         # Display filename
         self.filenameLabel = Label(self.ctrPanel, text="Filename: ", anchor=W)
         self.filenameLabel.pack(side=LEFT, padx=5)
@@ -204,7 +209,7 @@ class LabelTool():
 
     def selectForConnection(self):
         sel = self.listbox.curselection()
-        if len(sel) != 1 or len(self.selected_indices) == 2:
+        if len(sel) != 1:
             print("Please select exactly one bounding box.")
             return
 
@@ -214,8 +219,11 @@ class LabelTool():
             self.mainPanel.itemconfig(bbox_id, fill="", stipple="")  # Adjust color and transparency
             self.selected_indices.remove(idx)
             return
-        self.selected_indices.append(idx)
 
+        if len(sel) != 1 or len(self.selected_indices) == 2:
+            return
+
+        self.selected_indices.append(idx)
         # Apply high transparency color to the rectangle
         bbox_id = self.bboxIdList[idx]
         self.mainPanel.itemconfig(bbox_id, fill="blue", stipple="gray50")  # Adjust color and transparency
@@ -276,8 +284,7 @@ class LabelTool():
 
     def loadDir(self):
         if args.debug:
-            image_directory = 'Images/001'
-
+            image_directory = args.debug
         else:
             image_directory = self.entry.get()
             self.parent.focus()
@@ -384,6 +391,20 @@ class LabelTool():
         print(f"conn: {self.connections}")
 
     def saveImage(self):
+        if len(self.connections) == 0:
+            conn = []
+            for index, _ in enumerate(self.bboxList, start=1):
+                conn.append(
+                    {
+                        "object_id": index,
+                        "interaction": "no_interaction",
+                        "subject_id": 0
+                    }
+                )
+        else:
+            conn = self.connections
+
+
         data = {
             "filename": self.imagename,
             "height": self.img.height,
@@ -397,12 +418,12 @@ class LabelTool():
                 for x_min, y_min, x_max, y_max in [bbox]
                 for width, height in [(x_max - x_min + 1, y_max - y_min + 1)]
             ],
-            "hoi": self.connections
+            "hoi": conn
         }
 
         print(f"saved data: {data}")
         with open(self.labelfilename, 'w') as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f)
 
         # print('Image No. %d saved' % self.cur)
 
@@ -509,6 +530,7 @@ class LabelTool():
         self.mainPanel.delete(self.bboxIdList[idx])
         self.bboxIdList.pop(idx)
         self.bboxList.pop(idx)
+        self.bboxTypes.pop(idx)
         self.listbox.delete(idx)
 
     def clear_all_btn(self):
@@ -531,6 +553,10 @@ class LabelTool():
         self.bboxList = []
 
         # Clear connections
+        self.clear_all_connections()
+
+
+    def clear_all_connections(self):
         for line in self.connectionLines:
             self.mainPanel.delete(line)
         self.connectionLines = []
@@ -561,6 +587,8 @@ class LabelTool():
             self.saveImage()
             self.cur = idx
             self.loadImage()
+
+        self.parent.focus()
 
     def toggle_drag_mode(self):
         """Toggle the drag mode."""
