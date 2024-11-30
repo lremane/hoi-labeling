@@ -391,16 +391,21 @@ class LabelTool():
         print(f"conn: {self.connections}")
 
     def saveImage(self):
+        if len(self.connections) == 0 and len(self.bboxList) == 0:
+            return
+
         if len(self.connections) == 0:
             conn = []
-            for index, _ in enumerate(self.bboxList, start=1):
-                conn.append(
-                    {
-                        "object_id": index,
-                        "interaction": "no_interaction",
-                        "subject_id": 0
-                    }
-                )
+
+            if len(self.bboxTypes) != 0 and self.bboxTypes[0] == 'person':
+                for index, _ in enumerate(self.bboxList, start=1):
+                    conn.append(
+                        {
+                            "object_id": index,
+                            "interaction": "no_interaction",
+                            "subject_id": 0
+                        }
+                    )
         else:
             conn = self.connections
 
@@ -467,31 +472,40 @@ class LabelTool():
         y_offset = int(self.mainPanel.canvasy(event.y))
 
         if self.drag_mode:
-            for bbox_id in self.bboxIdList:
-                coords = self.mainPanel.coords(bbox_id)
-                x1, y1, x2, y2 = coords
+            sel = self.listbox.curselection()
+            if len(sel) != 1:
+                for bbox_id in self.bboxIdList:
+                    coords = self.mainPanel.coords(bbox_id)
+                    x1, y1, x2, y2 = coords
 
-                # Check if the click is near any corner
-                corners = {
-                    "top_left": (x1, y1),
-                    "top_right": (x2, y1),
-                    "bottom_left": (x1, y2),
-                    "bottom_right": (x2, y2)
-                }
+                    # Check if the click is near any corner
+                    corners = {
+                        "top_left": (x1, y1),
+                        "top_right": (x2, y1),
+                        "bottom_left": (x1, y2),
+                        "bottom_right": (x2, y2)
+                    }
 
-                for corner_name, (cx, cy) in corners.items():
-                    if abs(cx - x_offset) <= self.resize_threshold and abs(cy - y_offset) <= self.resize_threshold:
-                        # Start resizing
-                        self.resize_mode = True
-                        self.resize_data = {"x": x_offset, "y": y_offset, "item": bbox_id, "corner": corner_name}
+                    for corner_name, (cx, cy) in corners.items():
+                        if abs(cx - x_offset) <= self.resize_threshold and abs(cy - y_offset) <= self.resize_threshold:
+                            # Start resizing
+                            self.resize_mode = True
+                            self.resize_data = {"x": x_offset, "y": y_offset, "item": bbox_id, "corner": corner_name}
+                            return
+
+                    # Start dragging if click is within the rectangle
+                    if x1 <= x_offset <= x2 and y1 <= y_offset <= y2:
+                        self.drag_data["item"] = bbox_id
+                        self.drag_data["x"] = x_offset
+                        self.drag_data["y"] = y_offset
                         return
+            else:
+                idx = int(sel[0])
+                self.drag_data["item"] = self.bboxIdList[idx]
+                self.drag_data["x"] = x_offset
+                self.drag_data["y"] = y_offset
+                return
 
-                # Start dragging if click is within the rectangle
-                if x1 <= x_offset <= x2 and y1 <= y_offset <= y2:
-                    self.drag_data["item"] = bbox_id
-                    self.drag_data["x"] = x_offset
-                    self.drag_data["y"] = y_offset
-                    return
         else:
             # If not in drag mode, handle drawing a new rectangle
             if self.STATE['click'] == 0:
