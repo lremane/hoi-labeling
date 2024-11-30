@@ -1,0 +1,1 @@
+{"file_name": "reolink_overhead_0019.png", "height": 2048, "width": 2048, "gtboxes": [], "hoi": []}
