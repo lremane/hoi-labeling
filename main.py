@@ -94,6 +94,7 @@ class LabelTool():
         self.parent.bind("a", self.prevImage)  # press 'a' to go backward
         self.parent.bind("f", self.nextImage)  # press 'f' to go forward
         self.parent.bind("t", self.nextWithAnnotationsImage) # press 't' to move annotation to next image
+        self.parent.bind("v", self.nextRelabelImage)
         self.parent.bind("q", self.toggle_drag_mode)
 
 
@@ -170,6 +171,9 @@ class LabelTool():
         self.nextWithAnnotationsBtn = Button(self.ctrPanel, text='Next wA >>', width=10,
                                              command=self.nextWithAnnotationsImage)
         self.nextWithAnnotationsBtn.pack(side=LEFT, padx=5, pady=3)
+
+        self.nextRelabelBtn = Button(self.ctrPanel, text='Next relabel >>', width=10, command=self.nextRelabelImage)
+        self.nextRelabelBtn.pack(side=LEFT, padx=5, pady=3)
 
         # display mouse position
         self.disp = Label(self.ctrPanel, text='')
@@ -317,7 +321,7 @@ class LabelTool():
 
         self.loadImage()
 
-    def loadImage(self, prev=False):
+    def loadImage(self, prev=False, relabel=False):
         # load image
         imagepath = self.imageList[self.cur - 1]
         self.img = Image.open(imagepath)
@@ -339,7 +343,7 @@ class LabelTool():
         labelname = image_name_without_extension + '.txt'
         self.labelfilename = os.path.join(self.outDir, labelname)
 
-        if prev:
+        if prev or relabel:
             prev_image_path = self.imageList[self.cur - 2]
             prev_image_name_without_extension = os.path.split(prev_image_path)[-1].split('.')[0]
             prev_label_name = prev_image_name_without_extension + '.txt'
@@ -354,8 +358,12 @@ class LabelTool():
         with open(load_filename, 'r') as file:
             data = json.load(file)
 
-        # load bounding boxes
-        for index, gtbox in enumerate(data["gtboxes"]):
+        if relabel:
+            with open(self.labelfilename, 'r') as file:
+                data_person = json.load(file)
+
+            gtbox = data_person["gtboxes"][0]
+
             x1, y1, width, height = map(int, gtbox["box"])
             x2, y2 = x1 + width - 1, y1 + height - 1
             self.bboxList.append((x1, y1, x2, y2))
@@ -365,10 +373,45 @@ class LabelTool():
                 x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
             )
             self.bboxIdList.append(tmpId)
-            self.listbox.insert(END, f'[{index}][{label_type}]')
+            self.listbox.insert(END, f'[{0}][{label_type}]')
             # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
             self.listbox.itemconfig(len(self.bboxIdList) - 1,
                                     fg=COLORS[label_type if label_type == 'person' else 'object'])
+
+            for index, gtbox in enumerate(data["gtboxes"]):
+                if index == 0:
+                    continue
+
+                x1, y1, width, height = map(int, gtbox["box"])
+                x2, y2 = x1 + width - 1, y1 + height - 1
+                self.bboxList.append((x1, y1, x2, y2))
+                label_type = gtbox["tag"]
+                self.bboxTypes.append(label_type)
+                tmpId = self.mainPanel.create_rectangle(
+                    x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
+                )
+                self.bboxIdList.append(tmpId)
+                self.listbox.insert(END, f'[{index}][{label_type}]')
+                # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
+                self.listbox.itemconfig(len(self.bboxIdList) - 1,
+                                        fg=COLORS[label_type if label_type == 'person' else 'object'])
+
+        else:
+            # load bounding boxes
+            for index, gtbox in enumerate(data["gtboxes"]):
+                x1, y1, width, height = map(int, gtbox["box"])
+                x2, y2 = x1 + width - 1, y1 + height - 1
+                self.bboxList.append((x1, y1, x2, y2))
+                label_type = gtbox["tag"]
+                self.bboxTypes.append(label_type)
+                tmpId = self.mainPanel.create_rectangle(
+                    x1, y1, x2, y2, width=2, outline=COLORS[label_type if label_type == 'person' else 'object']
+                )
+                self.bboxIdList.append(tmpId)
+                self.listbox.insert(END, f'[{index}][{label_type}]')
+                # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
+                self.listbox.itemconfig(len(self.bboxIdList) - 1,
+                                        fg=COLORS[label_type if label_type == 'person' else 'object'])
 
         # loading connections
         for conn in data["hoi"]:
@@ -598,6 +641,12 @@ class LabelTool():
         if self.cur < self.total:
             self.cur += 1
             self.loadImage(prev=True)
+
+    def nextRelabelImage(self, event=None):
+        self.saveImage()
+        if self.cur < self.total:
+            self.cur += 1
+            self.loadImage(relabel=True)
 
     def gotoImage(self):
         idx = int(self.idxEntry.get())
