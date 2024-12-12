@@ -94,6 +94,7 @@ class LabelTool():
         self.parent.bind("a", self.prevImage)  # press 'a' to go backward
         self.parent.bind("f", self.nextImage)  # press 'f' to go forward
         self.parent.bind("t", self.nextWithAnnotationsImage) # press 't' to move annotation to next image
+        self.parent.bind("q", self.toggle_drag_mode)
 
 
         # showing bbox info & delete bbox &
@@ -122,8 +123,10 @@ class LabelTool():
                 ['cup', 'bottle'] +
                 ['couch'] +
                 ['apple'] +
-                ['book']
+                ['book'] +
+                ['laptop']
         )
+        self.objectOptions.sort()
         self.objectDropdown = ttk.OptionMenu(
             self.typePanel, StringVar(value='Object'), None, *self.objectOptions, command=self.setObjectType
         )
@@ -138,8 +141,10 @@ class LabelTool():
                                   ['drink_with'] +
                                   ['lie_on', 'sit_on'] +
                                   ['eat'] + # hold
-                                  ['read'] # hold -> erstmal nicht labeln
+                                  ['read'] + # hold -> erstmal nicht labeln
+                                  ['type_on'] # hold
         )
+        self.connectionOptions.sort()
         self.connectionDropdown = ttk.OptionMenu(
             self.typePanel, StringVar(value='Save Connection'), None, *self.connectionOptions,
             command=self.save_connection
@@ -391,8 +396,8 @@ class LabelTool():
         print(f"conn: {self.connections}")
 
     def saveImage(self):
-        if len(self.connections) == 0 and len(self.bboxList) == 0:
-            return
+        # if len(self.connections) == 0 and len(self.bboxList) == 0:
+        #     return
 
         if len(self.connections) == 0:
             conn = []
@@ -512,22 +517,21 @@ class LabelTool():
                 self.STATE['x'], self.STATE['y'] = x_offset, y_offset
                 self.STATE['click'] = 1
             else:
-                if not self.STATE['label_type']:
-                    print("Select a label type first (Person or Object).")
-                    return
                 x1, x2 = min(self.STATE['x'], x_offset), max(self.STATE['x'], x_offset)
                 y1, y2 = min(self.STATE['y'], y_offset), max(self.STATE['y'], y_offset)
                 self.bboxList.append((x1, y1, x2, y2))
-                self.bboxTypes.append(self.STATE['label_type'])
+                self.bboxTypes.append(self.STATE['label_type'])  # Default to the current label type
                 self.bboxIdList.append(self.bboxId)
                 self.bboxId = None
-                self.listbox.insert(END, f'[{len(self.bboxList) - 1}][{self.STATE['label_type']}')
-                # self.listbox.insert(END, f'[{x1} {y1} {x2} {y2}]')
+                self.listbox.insert(END, f'[{len(self.bboxList) - 1}][{self.STATE["label_type"]}]')
                 self.listbox.itemconfig(
                     len(self.bboxIdList) - 1,
                     fg=COLORS[self.STATE['label_type'] if self.STATE['label_type'] == 'person' else 'object']
                 )
                 self.STATE['click'] = 0
+
+                # Show the pop-up for label selection
+                self.show_label_selection_popup()
 
     def cancelBBox(self, event):
         if 1 == self.STATE['click']:
@@ -604,7 +608,7 @@ class LabelTool():
 
         self.parent.focus()
 
-    def toggle_drag_mode(self):
+    def toggle_drag_mode(self, event=None):
         """Toggle the drag mode."""
         self.drag_mode = not self.drag_mode
         if self.drag_mode:
@@ -662,6 +666,33 @@ class LabelTool():
                 fg=COLORS[self.bboxTypes[item_index] if self.bboxTypes[item_index] == 'person' else 'object']
             )
             self.drag_data = {"x": 0, "y": 0, "item": None}
+
+    def show_label_selection_popup(self):
+        popup = Toplevel(self.parent)
+        popup.title("Select Label")
+        popup.geometry("200x400")
+
+        label_var = StringVar(value=self.STATE['label_type'])
+
+        Label(popup, text="Choose a label:").pack(pady=10)
+
+        # Add radio buttons for label selection
+        for label in ['person'] + self.objectOptions:
+            Radiobutton(popup, text=label, variable=label_var, value=label).pack(anchor=W)
+
+        Button(popup, text="OK", command=lambda: self.set_label_from_popup(popup, label_var)).pack(pady=10)
+
+    def set_label_from_popup(self, popup, label_var):
+        selected_label = label_var.get()
+        self.STATE['label_type'] = selected_label
+        self.bboxTypes[-1] = selected_label  # Update the last bounding box's type
+        self.listbox.delete(len(self.bboxList) - 1)  # Remove and re-add the last bbox entry
+        self.listbox.insert(END, f'[{len(self.bboxList) - 1}][{selected_label}]')
+        self.listbox.itemconfig(
+            len(self.bboxIdList) - 1,
+            fg=COLORS[selected_label if selected_label == 'person' else 'object']
+        )
+        popup.destroy()
 
 
 if __name__ == '__main__':
