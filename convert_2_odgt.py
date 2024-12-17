@@ -1,7 +1,7 @@
 import os
 import glob
 
-labels_dir_path = 'Labels/2fps'
+labels_dir_path = 'Labels/2fps/hanwha_QNF-8010_wallmount'
 odgt_file_path = 'Labels/hanwha_QNF-8010_wallmount.odgt'
 
 txt_files = glob.glob(os.path.join(labels_dir_path, "*.txt"))

@@ -1,0 +1,1 @@
+{"file_name": "hanwha_QNF-8010_overhead_0443.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1349, 791, 394, 162]}, {"tag": "cell phone", "box": [1637, 798, 23, 34]}], "hoi": [{"object_id": 1, "interaction": "talk_on", "subject_id": 0}]}

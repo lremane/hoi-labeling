@@ -1,0 +1,1 @@
+{"file_name": "hanwha_QNF-8010_wallmount_0281.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [736, 1061, 138, 375]}, {"tag": "laptop", "box": [735, 1147, 58, 56]}], "hoi": [{"object_id": 1, "interaction": "hold", "subject_id": 0}]}

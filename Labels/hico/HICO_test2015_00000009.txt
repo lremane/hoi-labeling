@@ -1,0 +1,1 @@
+{"file_name": "HICO_test2015_00000009.jpg", "height": 640, "width": 426, "gtboxes": [{"tag": "person", "box": [22, 18, 371, 608]}, {"tag": "cake", "box": [64, 473, 270, 154]}], "hoi": [{"object_id": 1, "interaction": "blow", "subject_id": 0}]}

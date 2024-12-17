@@ -1,0 +1,1 @@
+{"file_name": "reolink_overhead_0566.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [665, 1714, 117, 129]}, {"tag": "book", "box": [718, 1724, 61, 34]}], "hoi": [{"object_id": 1, "interaction": "read", "subject_id": 0}]}

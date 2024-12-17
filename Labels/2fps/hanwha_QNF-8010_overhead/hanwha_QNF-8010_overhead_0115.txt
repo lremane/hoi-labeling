@@ -1,0 +1,1 @@
+{"file_name": "hanwha_QNF-8010_overhead_0115.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1266, 1197, 310, 325]}, {"tag": "apple", "box": [1389, 1393, 29, 34]}], "hoi": [{"object_id": 1, "interaction": "hold", "subject_id": 0}]}

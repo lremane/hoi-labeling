@@ -1,0 +1,1 @@
+{"file_name": "hanwha_QNF-8010_overhead_0002.png", "height": 2048, "width": 2048, "gtboxes": [], "hoi": []}

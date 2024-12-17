@@ -1,1 +1,1 @@
-{"file_name": "reolink_overhead_0146.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "cup", "box": [1349, 1144, 76, 64]}, {"tag": "apple", "box": [1594, 1028, 42, 44]}, {"tag": "couch", "box": [1413, 1444, 275, 257]}, {"tag": "couch", "box": [1673, 1099, 141, 347]}], "hoi": []}
+{"file_name": "reolink_overhead_0146.png", "height": 2048, "width": 2048, "gtboxes": [], "hoi": []}
