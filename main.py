@@ -96,6 +96,7 @@ class LabelTool():
         self.parent.bind("t", self.nextWithAnnotationsImage) # press 't' to move annotation to next image
         self.parent.bind("v", self.nextRelabelImage)
         self.parent.bind("q", self.toggle_drag_mode)
+        self.parent.bind("p", self.clear_all_connections)
 
 
         # showing bbox info & delete bbox &
@@ -617,7 +618,7 @@ class LabelTool():
         self.clear_all_connections()
 
 
-    def clear_all_connections(self):
+    def clear_all_connections(self, event=None):
         for line in self.connectionLines:
             self.mainPanel.delete(line)
         self.connectionLines = []

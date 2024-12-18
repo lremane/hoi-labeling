@@ -1,1 +1,1 @@
-{"file_name": "hanwha_QNF-8010_overhead_0065.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1467, 864, 261, 97]}, {"tag": "couch", "box": [1464, 890, 233, 236]}], "hoi": [{"object_id": 1, "interaction": "sit_on", "subject_id": 0}, {"object_id": 2, "interaction": "hold", "subject_id": 0}]}
+{"file_name": "hanwha_QNF-8010_overhead_0065.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1467, 864, 261, 97]}, {"tag": "couch", "box": [1464, 890, 233, 236]}], "hoi": [{"object_id": 1, "interaction": "sit_on", "subject_id": 0}]}

@@ -1,1 +1,1 @@
-{"file_name": "hanwha_QNF-8010_overhead_0949.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1327, 1056, 402, 185]}, {"tag": "cell phone", "box": [1615, 1163, 46, 30]}], "hoi": [{"object_id": 1, "interaction": "talk_on", "subject_id": 0}]}
+{"file_name": "hanwha_QNF-8010_overhead_0949.png", "height": 2048, "width": 2048, "gtboxes": [{"tag": "person", "box": [1328, 1050, 398, 186]}, {"tag": "cell phone", "box": [1614, 1162, 53, 38]}], "hoi": [{"object_id": 1, "interaction": "talk_on", "subject_id": 0}]}
