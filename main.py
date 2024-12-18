@@ -446,7 +446,7 @@ class LabelTool():
             conn = []
 
             if len(self.bboxTypes) != 0 and self.bboxTypes[0] == 'person':
-                for index, _ in enumerate(self.bboxList, start=1):
+                for index, _ in enumerate(self.bboxList[1:], start=1):
                     conn.append(
                         {
                             "object_id": index,
